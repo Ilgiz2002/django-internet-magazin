@@ -1,9 +1,11 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from django.contrib.contenttypes.fields import  GenericForeignKey
+from django.contrib.contenttypes.fields import GenericForeignKey
 
 User = get_user_model()
+
+
 # Исльзовать пользователя, который указан в settings.AUTH_USER_MODEL
 
 # Основные модели
@@ -17,6 +19,34 @@ User = get_user_model()
 # 6 Customers
 # 7 Specification -> Характеристики продукта
 
+class LatestProductsManager:
+
+    @staticmethod
+    def get_products_for_main_page(*args, **kwargs):
+        with_respect_to = kwargs.get('with_respect_to')
+        # приоритет для какой-то модели
+        products = []
+        ct_models = ContentType.objects.filter(model__in=args)
+        for ct_model in ct_models:
+            model_products = ct_model.model_class()._base_manager.all().order_by('-id')[:5]
+            # Вызов у модели ContentType родительский класс
+            products.extend(model_products)
+        if with_respect_to:
+            ct_model = ContentType.objects.filter(model=with_respect_to)
+            if ct_model.exists():
+                if with_respect_to in args:
+                    return sorted(
+                        products,
+                        key=lambda x: x.__class__._meta.model_name.startswith(with_respect_to),
+                        reverse=True
+                                  )
+        return products
+
+
+class LatersProducts:
+    """Получение товаров разных моделей в одной через ContentType"""
+    objects = LatestProductsManager()
+
 
 class Category(models.Model):
     name = models.CharField(max_length=255, verbose_name='Имя категории')
@@ -27,12 +57,12 @@ class Category(models.Model):
 
 
 class Product(models.Model):
-
     class Meta:
         abstract = True
         # Абстрактная модель ->
         # 1. Невозможно создать миграцию для этой модели
         # 2. Сама по себе ничего не представляет, нужно создать дочерний класс
+
     category = models.ForeignKey(
         Category,
         verbose_name='Категория',
@@ -49,6 +79,7 @@ class Product(models.Model):
         decimal_places=2,
         verbose_name='Цена'
     )
+
     # max_digits -> из скольки цифр должно состоять число
     # decimal_places -> цифр после запятой
 
@@ -122,6 +153,7 @@ class Customer(models.Model):
     )
     phone = models.CharField(max_length=20, verbose_name='Номер телефона')
     address = models.CharField(max_length=255, verbose_name='Адрес')
+
     # Использовать first_name и last_name не будем так как эти поля есть
     # в классе User
 
