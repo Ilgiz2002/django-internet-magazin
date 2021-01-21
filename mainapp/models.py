@@ -1,3 +1,4 @@
+from PIL import Image
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
@@ -18,6 +19,18 @@ User = get_user_model()
 # Дополнительные модели
 # 6 Customers
 # 7 Specification -> Характеристики продукта
+
+
+class MinResolutionErrorException(Exception):
+    pass
+
+
+class MaxResolutionErrorException(Exception):
+    pass
+
+class MaxImageSizeErrorException(Exception):
+    pass
+
 
 class LatestProductsManager:
 
@@ -57,6 +70,11 @@ class Category(models.Model):
 
 
 class Product(models.Model):
+
+    MIN_RESOLUTION = (400, 400)
+    MAX_RESOLUTION = (800, 800)
+    MAX_IMAGE_SIZE = 3145728
+
     class Meta:
         abstract = True
         # Абстрактная модель ->
@@ -85,6 +103,22 @@ class Product(models.Model):
 
     def __str__(self):
         return self.title
+
+    def save(self, *args, **kwargs):
+        image = self.image
+        img = Image.open(image)
+        min_height, min_width = self.MIN_RESOLUTION
+        max_height, max_width = self.MAX_RESOLUTION
+
+        if image.size > Product.MAX_IMAGE_SIZE:
+            raise MaxImageSizeErrorException('Размер изображения не должен превышать 3MB!')
+        if img.height < min_height or img.width < min_width:
+            raise MinResolutionErrorException(
+                'Разрешение изображения меньше минимального!')
+        if img.height > max_height or img.width > max_width:
+            raise MaxResolutionErrorException(
+                'Разрешение изображения больше максимального!')
+        return image
 
 
 class CartProduct(models.Model):
@@ -120,7 +154,7 @@ class CartProduct(models.Model):
     )
 
     def __str__(self):
-        return f'Продукт : {self.product.title}'
+        return f'Продукт : {self.content_object.title}'
 
 
 class Cart(models.Model):
