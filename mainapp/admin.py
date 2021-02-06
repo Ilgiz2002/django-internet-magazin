@@ -10,24 +10,26 @@ class NotebookAdminForm(ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['image'].help_text = mark_safe(f'<span style="color:red; font-size:14px">Загружайте изображение с минимальным разрешением {Product.MIN_RESOLUTION[0]}x{Product.MIN_RESOLUTION[1]}</span>')
+        self.fields['image'].help_text = mark_safe(
+            f"""<span style="color:red; font-size:14px">При загрузке изображения с разрешением больше {Product.MAX_RESOLUTION[0]}x{Product.MAX_RESOLUTION[1]} оно будет обрезано !</span>""")
         # mark_safe -> превращает обычную строку в HTML код
 
-    def clean_image(self):
-        image = self.cleaned_data['image']
-        img = Image.open(image)
-        min_height, min_width = Product.MIN_RESOLUTION
-        max_height, max_width = Product.MAX_RESOLUTION
-
-        if image.size > Product.MAX_IMAGE_SIZE:
-            raise ValidationError('Размер изображения не должен превышать 3MB!')
-        if img.height < min_height or img.width < min_width:
-            raise ValidationError(
-                'Разрешение изображения меньше минимального!')
-        if img.height > max_height or img.width > max_width:
-            raise ValidationError(
-                'Разрешение изображения больше максимального!')
-        return image
+    # def clean_image(self):
+    #     image = self.cleaned_data['image']
+    #     img = Image.open(image)
+    #     min_height, min_width = Product.MIN_RESOLUTION
+    #     max_height, max_width = Product.MAX_RESOLUTION
+    #
+    #     if image.size > Product.MAX_IMAGE_SIZE:
+    #         raise ValidationError(
+    #             'Размер изображения не должен превышать 3MB!')
+    #     if img.height < min_height or img.width < min_width:
+    #         raise ValidationError(
+    #             'Разрешение изображения меньше минимального!')
+    #     if img.height > max_height or img.width > max_width:
+    #         raise ValidationError(
+    #             'Разрешение изображения больше максимального!')
+    #     return image
 
 
 class NotebookAdmin(admin.ModelAdmin):

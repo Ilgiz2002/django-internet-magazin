@@ -1,9 +1,16 @@
+import sys
+
 from PIL import Image
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
+from django.core.files.uploadedfile import InMemoryUploadedFile
 
+from io import BytesIO
+from django.urls import reverse
+
+# Используется для того что бы картинку преобразовать в байты на строке 107
 User = get_user_model()
 
 
@@ -20,15 +27,16 @@ User = get_user_model()
 # 6 Customers
 # 7 Specification -> Характеристики продукта
 
+def get_product_url(obj, viewname):
+    ct_model = obj.__class__._meta.model_name
+    return reverse(viewname, kwargs={'ct_model': ct_model, 'slug': obj.slug})
+
 
 class MinResolutionErrorException(Exception):
     pass
 
 
 class MaxResolutionErrorException(Exception):
-    pass
-
-class MaxImageSizeErrorException(Exception):
     pass
 
 
@@ -107,18 +115,31 @@ class Product(models.Model):
     def save(self, *args, **kwargs):
         image = self.image
         img = Image.open(image)
-        min_height, min_width = self.MIN_RESOLUTION
-        max_height, max_width = self.MAX_RESOLUTION
+        # Преобразуем цветовой канал картинки в RGB
+        new_img = img.convert('RGB')
+        # Уменьшаем размер картинки, ANTIALIAS -> ?
+        resized_new_img = new_img.resize((200, 200), Image.ANTIALIAS)
+        # Записываем картику в байты
+        filestream = BytesIO()
+        resized_new_img.save(filestream, 'JPEG', quality=90)
 
-        if image.size > Product.MAX_IMAGE_SIZE:
-            raise MaxImageSizeErrorException('Размер изображения не должен превышать 3MB!')
-        if img.height < min_height or img.width < min_width:
-            raise MinResolutionErrorException(
-                'Разрешение изображения меньше минимального!')
-        if img.height > max_height or img.width > max_width:
-            raise MaxResolutionErrorException(
-                'Разрешение изображения больше максимального!')
-        return image
+        name = '{}'.format(self.image.name.split('.'))
+        self.image = InMemoryUploadedFile(
+            filestream, 'ImageField', name, 'jpeg/image', sys.getsizeof(filestream), None
+        )
+        # img = Image.open(image)
+        # min_height, min_width = self.MIN_RESOLUTION
+        # max_height, max_width = self.MAX_RESOLUTION
+        #
+        # if img.height < min_height or img.width < min_width:
+        #     raise MinResolutionErrorException(
+        #         'Разрешение изображения меньше минимального!')
+        # if img.height > max_height or img.width > max_width:
+        #     raise MaxResolutionErrorException(
+        #         'Разрешение изображения больше максимального!')
+        super().save(*args, **kwargs)
+        # Если не вызвать родительский метод save -> мы получим ошибку,
+        # по той причине, что мы переопределим род. метод
 
 
 class CartProduct(models.Model):
@@ -213,6 +234,9 @@ class Notebook(Product):
     def __str__(self):
         return f'{self.category.name} {self.title}'
 
+    def get_absolute_url(self):
+        return get_product_url(self, 'product_detail')
+
 
 class Smartphone(Product):
     diagonal = models.CharField(max_length=255, verbose_name='Диагональ')
@@ -239,3 +263,6 @@ class Smartphone(Product):
 
     def __str__(self):
         return f'{self.category.name} {self.title}'
+
+    def get_absolute_url(self):
+        return get_product_url(self, 'product_detail')
